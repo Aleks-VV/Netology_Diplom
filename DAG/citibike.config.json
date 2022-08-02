@@ -1,0 +1,9 @@
+{
+  "afbucket": "airflow-bucket-381305083104-mwaa-emr-on-eks-blog",
+  "YR": "2019",
+  "SRC_BUCKET": "tripdata",
+  "SRC_KEY": "-citibike-tripdata.csv.zip",
+  "DEST_KEY": "-citibike-tripdata.csv",
+  "DAG_NAME": "Citibike_Ridership_Analytics",
+  "LOCAL_PATH": "/opt/airflow/data/csv"
+}
