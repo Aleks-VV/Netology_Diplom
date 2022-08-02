@@ -97,12 +97,12 @@ def copy_and_unzip_s3(**context):
 
 
 class ClickHouseConnection:
+    connection = None
 
     def get_connection(connection_name='clickhouse'):
-        connection = None
         if ClickHouseConnection.connection:
             return connection
-        db_props = BaseHook.get_connection('clickhouse')
+        db_props = BaseHook.get_connection(connection_name)
         ClickHouseConnection.connection = Client(db_props.host, settings=settings)
         return ClickHouseConnection.connection
 
