@@ -1,5 +1,6 @@
 """
 
+
 """
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -273,7 +274,7 @@ def make_metrics_from_clickhouse(**context):
 def disable_task_if_success(**context):
     """
     При успешной обработке файла и выгрузки отчетов сохраняем файл с результатом выгрузки для дальнейшего 
-    исключения из обработки 
+    исключения из обработки
     """
     with open(context['destlogfilename'], 'w') as f:
         f.write('Success')
