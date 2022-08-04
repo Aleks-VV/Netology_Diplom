@@ -1,5 +1,5 @@
 {
-  "afbucket": "airflow-bucket-381305083104-mwaa-emr-on-eks-blog",
+  "afbucket": "airflow-bucket-000000000000-mwaa-emr-on-eks-blog",
   "YR": "2019",
   "SRC_BUCKET": "tripdata",
   "SRC_KEY": "-citibike-tripdata.csv.zip",
