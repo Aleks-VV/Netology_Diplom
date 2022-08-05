@@ -1,7 +1,3 @@
-"""
-
-
-"""
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
@@ -33,22 +29,6 @@ now = datetime.now()
 
 
 def find_max_month():
-    """
-    В бакете хранятся несколько видов файлов статистики:
-    до 01.01.2017
-    202206-citbike-tripdata.csv.zip
-    после 01.01.2017
-    202206-citbike-tripdata.csv.zip полный вариант
-    JC-202206-citibike-tripdata.csv.zip урезанный вариант
-
-    Для полноты анализа данных будем брать полные данные и отсекать урезанные данные т.е. файлы  с JC в имени.
-    Данные выгружаются каждый месяц, но в произвольный день.
-    Для поиска новых фалов нам нужно знать сколько всего фалов нужных нам данных находятся в хранилище.
-    Для упрощения и чтоб не делать лишние проверки: число файлов не может быть больше чем число месяцев в году
-    на текущую дату если смотрим текущий год и не более 12 месяцев если смотри предыдущие года.
-    Например: берем 2022 год, загружаем весь список имен файлов с хранилища отфильтровываем его по году
-    и полноте данных. Получаем 6 файлов за 6 месяцев. Переменная mo возвращает значение 6.
-    """
     conn = boto3.client('s3', region_name=cfg_key['region_name'], aws_access_key_id=cfg_key['aws_access_key_id'],
                         aws_secret_access_key=cfg_key['aws_secret_access_key'])
     mo = 0
@@ -60,9 +40,6 @@ def find_max_month():
 
 
 def copy_and_unzip_s3(**context):
-    """
-    Загружаем отсутствующие архивные файлы с полной выгрузкой из S3 бакета и распаковываем их локально и в свой S3 бакет
-    """
     s3_resource = boto3.resource('s3', region_name=cfg_key['region_name'],
                                  aws_access_key_id=cfg_key['aws_access_key_id'],
                                  aws_secret_access_key=cfg_key['aws_secret_access_key'])
@@ -83,19 +60,6 @@ def copy_and_unzip_s3(**context):
             print(e)
 
 
-"""
-        try:
-            response = s3_resource.meta.client.upload_fileobj(
-                z.open(filename),
-                Bucket=context['destbucket'],
-                Key=context['destkey']
-            )
-            print('uploaded to s3 {}'.format(filename))
-        except Exception as e:
-            print(e)
-"""
-
-
 class ClickHouseConnection:
     connection = None
 
@@ -108,11 +72,6 @@ class ClickHouseConnection:
 
 
 def iter_csv(filename):
-    """
-    Функция преобразует типы данных и формат времени соответствующий типу данных таблицы ClickHouse и формату даты
-    используемому в таблицах  ClickHouse и понятному плагину clickhouse_driver. Плагин clickhouse_driver не понимает
-    формат данных типа 00:07:07.5810 когда после точки более 3 чисел.
-    """
     converters = {
         'tripduration': int,
         'start_station_id': int,
@@ -143,14 +102,8 @@ def iter_csv(filename):
 
 
 def copy_to_clickhouse(**context):
-    """
-    Открываем csv файл и загружаем в таблицу ClickHouse.
-    """
     ch_connection = ClickHouseConnection.get_connection()
     logging.info("CLIENT ADDED")
-
-    # ch_connection.execute("DROP DATABASE IF EXISTS citibike")
-    # logging.info("DROP DATABASE IF EXISTS citibike")
 
     ch_connection.execute("CREATE DATABASE IF NOT EXISTS citibike")
     logging.info("CREATE DATABASE citibike")
@@ -185,13 +138,9 @@ def copy_to_clickhouse(**context):
 
 
 def make_metrics_from_clickhouse(**context):
-    """
-    Делаем запросы к базе ClickHouse по перечню заданий и сохраняем в csv.
-    """
     ch_connection = ClickHouseConnection.get_connection()
     logging.info("CLIENT ADDED")
 
-    # Количество поездок в день за определенный месяц
     result1 = ch_connection.execute(
         f"select toDate(starttime) AS date_local  , count(*) AS trip_on_days from citibike.data_csv dc WHERE MONTH("
         f"`starttime`) = MONTH(toDate('{context['startdate']}')) and YEAR(`starttime`) = YEAR(toDate('"
@@ -203,12 +152,7 @@ def make_metrics_from_clickhouse(**context):
     print(result1)
     df1 = pd.DataFrame(result1)
     df1.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-count.csv', index=False)
-    """
-    df1.to_csv("s3://" + context['destbucket'] + context["destkeymetrics"] + "-export-data-trip-count.csv",
-              storage_options={'key': cfg_key['aws_access_key_id'],
-                               'secret': cfg_key['aws_secret_access_key']})
-    """
-    # Cредняя продолжительность поездок в день за месяц
+
     result2 = ch_connection.execute(
         f"select toDate(starttime) AS date_local  , round(avg (tripduration)) AS avg_tripduration_on_days_sec, "
         f"formatDateTime(CAST(toUInt32(avg_tripduration_on_days_sec) AS DATETIME), '%H:%M:%S') AS "
@@ -224,13 +168,7 @@ def make_metrics_from_clickhouse(**context):
         f"date_local  order by date_local")
     df2 = pd.DataFrame(result2)
     df2.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripduration-avg.csv', index=False)
-    """
-    df1.to_csv("s3://" + context['destbucket'] + context["destkeymetrics"] + "-export-data-tripduration-avg.csv",
-              storage_options={'key': cfg_key['aws_access_key_id'],
-                               'secret': cfg_key['aws_secret_access_key']})
-    """
 
-    # Распределение поездок пользователей, разбитых по категории «gender» за месяц
     result3 = ch_connection.execute(
         f"select toDate(starttime) AS date_local, gender, count(starttime) AS trip_on_days from citibike.data_csv dc "
         f"WHERE MONTH(`starttime`) = MONTH(toDate('{context['startdate']}')) and YEAR(`starttime`) = YEAR(toDate('"
@@ -242,13 +180,7 @@ def make_metrics_from_clickhouse(**context):
     print(result3)
     df3 = pd.DataFrame(result3)
     df3.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-by-gender.csv', index=False)
-    """
-    df1.to_csv("s3://" + context['destbucket'] + context["destkeymetrics"] + "-export-data-trip-by-gender.csv",
-              storage_options={'key': cfg_key['aws_access_key_id'],
-                               'secret': cfg_key['aws_secret_access_key']})
-    """
 
-    # Все вместе в одной таблице
     result4 = ch_connection.execute(
         f"select toDate(starttime) AS date_local, gender, round(avg (tripduration)) AS avg_tripduration_on_days_sec, "
         f"formatDateTime(CAST(toUInt32(avg_tripduration_on_days_sec) AS DATETIME), '%H:%M:%S') AS "
@@ -264,31 +196,15 @@ def make_metrics_from_clickhouse(**context):
         f"{context['startdate']}')) group by date_local, gender  order by date_local")
     df4 = pd.DataFrame(result4)
     df4.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripdata-full.csv', index=False)
-    """
-    df1.to_csv("s3://" + context['destbucket'] + context["destkeymetrics"] + "-export-data-tripdata-full.csv",
-              storage_options={'key': cfg_key['aws_access_key_id'],
-                               'secret': cfg_key['aws_secret_access_key']})
-    """
 
-
+    
 def disable_task_if_success(**context):
-    """
-    При успешной обработке файла и выгрузки отчетов сохраняем файл с результатом выгрузки для дальнейшего 
-    исключения из обработки
-    """
     with open(context['destlogfilename'], 'w') as f:
         f.write('Success')
     f.close()
-    """s3_resource_log = boto3.resource('s3', region_name=cfg_key['region_name'], aws_access_key_id=cfg[
-    'aws_access_key_id'], aws_secret_access_key=cfg_key['aws_secret_access_key']) text = "Success" 
-    s3_resource_log.Object(context['destbucket'], context['destlogkeyname']).put(Body=text) """
 
 
 def list_bucket(bucket):
-    """
-    Функция поиска лог файлов с успешным выполнением заданий загрузки файлов. 
-    """
-    # listkey = ''
     conn = boto3.client('s3', region_name=cfg_key['region_name'], aws_access_key_id=cfg_key['aws_access_key_id'],
                         aws_secret_access_key=cfg[
                             'aws_secret_access_key'])  
@@ -331,16 +247,6 @@ with DAG(
         NEW_DEST_LOG_KEYNAME = '/citibike/csv/logs/' + YR + str(i).zfill(2) + '-citibike-tripdata.log'
         NEW_DEST_FILE_PATH_METRICS = cfg['LOCAL_PATH'] + '/metrics/' + YR + str(i).zfill(2)
         PATH = Path(NEW_DEST_LOG_FILENAME)
-        '''
-        # Проверяем есть ли новый файл в хранилище путем изучения лог файлов успешной обработки csv файлов.
-        for key in list_bucket(DEST_BUCKET):
-            if NEW_DEST_LOG_KEYNAME in key['Key']:
-                    print(key['Key'])
-                    logging.info(f'The file {NEW_DEST_LOG_KEYNAME} exists')
-            else:
-                    logging.info(f'The file {NEW_DEST_LOG_KEYNAME} does not exist')
-                    ................
-        '''
         if PATH.is_file():
             logging.info(f'The file {NEW_DEST_LOG_FILENAME} exists')
         else:
