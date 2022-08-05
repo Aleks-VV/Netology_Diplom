@@ -151,7 +151,8 @@ def make_metrics_from_clickhouse(**context):
         f"{context['startdate']}')) group by date_local  order by date_local")
     print(result1)
     df1 = pd.DataFrame(result1)
-    df1.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-count.csv', index=False)
+    df1.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-count.csv',
+               header=['date', 'trip_on_days'], index=False)
 
     result2 = ch_connection.execute(
         f"select toDate(starttime) AS date_local  , round(avg (tripduration)) AS avg_tripduration_on_days_sec, "
@@ -167,7 +168,8 @@ def make_metrics_from_clickhouse(**context):
         f"{context['startdate']}')) and YEAR(`starttime`) = YEAR(toDate('{context['startdate']}')) group by "
         f"date_local  order by date_local")
     df2 = pd.DataFrame(result2)
-    df2.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripduration-avg.csv', index=False)
+    df2.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripduration-avg.csv',
+               header=['date', ' avg_tripduration_on_days_sec', 'avg_tripduration_on_days_hms'], index=False)
 
     result3 = ch_connection.execute(
         f"select toDate(starttime) AS date_local, gender, count(starttime) AS trip_on_days from citibike.data_csv dc "
@@ -179,7 +181,8 @@ def make_metrics_from_clickhouse(**context):
         f"{context['startdate']}')) group by date_local, gender  order by date_local")
     print(result3)
     df3 = pd.DataFrame(result3)
-    df3.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-by-gender.csv', index=False)
+    df3.to_csv(f'{context["destfilepathmetrics"]}-export-data-trip-by-gender.csv',
+               header=['date', ' gender', 'trip_on_days'], index=False)
 
     result4 = ch_connection.execute(
         f"select toDate(starttime) AS date_local, gender, round(avg (tripduration)) AS avg_tripduration_on_days_sec, "
@@ -195,8 +198,9 @@ def make_metrics_from_clickhouse(**context):
         f"`starttime`) = MONTH(toDate('{context['startdate']}')) and YEAR(`starttime`) = YEAR(toDate('"
         f"{context['startdate']}')) group by date_local, gender  order by date_local")
     df4 = pd.DataFrame(result4)
-    df4.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripdata-full.csv', index=False)
-
+    df4.to_csv(f'{context["destfilepathmetrics"]}-export-data-tripdata-full.csv',
+               header=['date', ' gender', 'avg_tripduration_on_days_sec', 'avg_tripduration_on_days_hms',
+                       'trip_on_days'], index=False)
     
 def disable_task_if_success(**context):
     with open(context['destlogfilename'], 'w') as f:
